@@ -2,70 +2,70 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>iPhone Style Camera</title>
+<title>iPhone Camera Clone</title>
 <style>
     body {
         margin: 0;
         background: black;
-        font-family: Arial, sans-serif;
-        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         display: flex;
         justify-content: center;
         align-items: center;
         height: 100vh;
+        color: white;
     }
 
     .camera-container {
         width: 360px;
         height: 720px;
-        background: #000;
+        background: black;
         border-radius: 40px;
-        border: 2px solid #333;
-        position: relative;
+        border: 2px solid #222;
         overflow: hidden;
+        position: relative;
     }
 
+    video, #photo {
+        width: 100%;
+        height: 75%;
+        object-fit: cover;
+        border-radius: 20px;
+        margin-top: 60px;
+    }
+
+    #photo {
+        display: none;
+    }
+
+    /* Top Bar */
     .top-bar {
         position: absolute;
         top: 15px;
         width: 100%;
         text-align: center;
-        font-size: 14px;
+        font-size: 15px;
         opacity: 0.8;
-        z-index: 10;
+        z-index: 20;
     }
 
-    video, #capturedPhoto {
-        width: 100%;
-        height: 70%;
-        object-fit: cover;
-        margin-top: 60px;
-        border-radius: 20px;
-        display: block;
-    }
-
-    #capturedPhoto {
-        display: none;
-    }
-
+    /* Modes */
     .modes {
         display: flex;
         justify-content: space-around;
         margin-top: 10px;
-        z-index: 10;
-    }
-
-    .mode {
         font-size: 16px;
-        opacity: 0.5;
     }
-
+    .mode {
+        opacity: 0.5;
+        transition: 0.3s;
+    }
     .mode.active {
         opacity: 1;
+        color: #ffd900;
         font-weight: bold;
-        color: #ffd600;
     }
 
+    /* Shutter */
     .shutter-area {
         position: absolute;
         bottom: 30px;
@@ -79,19 +79,86 @@
     .shutter {
         width: 80px;
         height: 80px;
-        background: white;
+        border: 6px solid white;
         border-radius: 50%;
-        border: 5px solid #ccc;
+        background: rgba(255,255,255,0.8);
         cursor: pointer;
+        transition: 0.2s;
+    }
+    .shutter:active {
+        transform: scale(0.9);
+        background: white;
     }
 
+    /* Back button */
     .back-btn {
         width: 60px;
         height: 60px;
-        border-radius: 50%;
         border: 3px solid white;
+        border-radius: 50%;
         display: none;
+    }
+
+    /* Tap to Focus effect */
+    .focus-ring {
+        position: absolute;
+        border: 2px solid yellow;
+        width: 80px;
+        height: 80px;
+        border-radius: 10px;
+        transform: translate(-40px, -40px);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s, transform 0.2s;
+    }
+
+    /* Flash effect */
+    .flash-screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: white;
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.25s;
+    }
+
+    /* Zoom wheel */
+    .zoom-controls {
+        position: absolute;
+        bottom: 130px;
+        width: 100%;
+        text-align: center;
+        z-index: 20;
+    }
+
+    .zoom-btn {
+        display: inline-block;
+        background: rgba(0,0,0,0.5);
+        padding: 10px 18px;
+        border-radius: 25px;
+        margin: 0 8px;
+        border: 1px solid white;
+        font-size: 14px;
         cursor: pointer;
+    }
+
+    .zoom-btn.active {
+        background: white;
+        color: black;
+        font-weight: bold;
+    }
+
+    /* Camera Flip Button */
+    .flipBtn {
+        position: absolute;
+        right: 20px;
+        bottom: 140px;
+        font-size: 28px;
+        cursor: pointer;
+        opacity: 0.8;
     }
 </style>
 </head>
@@ -99,12 +166,23 @@
 
 <div class="camera-container">
 
-    <div class="top-bar">
-        ● ○ 1x &nbsp; Portrait OFF
-    </div>
+    <div class="top-bar">● ○ 1x &nbsp;&nbsp; Portrait OFF</div>
 
     <video id="camera" autoplay playsinline></video>
-    <img id="capturedPhoto">
+    <img id="photo">
+
+    <div class="focus-ring" id="focusRing"></div>
+    <div class="flash-screen" id="flashScreen"></div>
+
+    <!-- Zoom -->
+    <div class="zoom-controls">
+        <span class="zoom-btn" onclick="setZoom(0.5)">0.5x</span>
+        <span class="zoom-btn active" onclick="setZoom(1)">1x</span>
+        <span class="zoom-btn" onclick="setZoom(2)">2x</span>
+    </div>
+
+    <!-- Flip Camera -->
+    <div class="flipBtn" onclick="flipCamera()">🔄</div>
 
     <div class="modes">
         <div class="mode">PORTRAIT</div>
@@ -120,45 +198,98 @@
 </div>
 
 <script>
-    const video = document.getElementById("camera");
-    const capturedPhoto = document.getElementById("capturedPhoto");
-    const backBtn = document.getElementById("backBtn");
+    let video = document.getElementById("camera");
+    let photo = document.getElementById("photo");
+    let focusRing = document.getElementById("focusRing");
+    let flashScreen = document.getElementById("flashScreen");
+    let backBtn = document.getElementById("backBtn");
+
+    let currentStream;
+    let facingMode = "environment";
 
     // Start Camera
     async function startCamera() {
+        if (currentStream) {
+            currentStream.getTracks().forEach(t => t.stop());
+        }
+
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
+            currentStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: facingMode }
+            });
+            video.srcObject = currentStream;
         } catch (err) {
-            console.log("Camera error:", err);
-            alert("Camera access blocked!");
+            alert("Camera Blocked!");
         }
     }
     startCamera();
 
-    // Take Photo
+    // Flip Camera
+    function flipCamera() {
+        facingMode = facingMode === "environment" ? "user" : "environment";
+        startCamera();
+    }
+
+    // Tap to focus (fake effect)
+    video.addEventListener("click", (e) => {
+        let rect = video.getBoundingClientRect();
+        let x = e.clientX - rect.left;
+        let y = e.clientY - rect.top;
+
+        focusRing.style.left = x + "px";
+        focusRing.style.top = y + "px";
+        focusRing.style.opacity = 1;
+        focusRing.style.transform = "translate(-40px, -40px) scale(1.2)";
+
+        setTimeout(() => {
+            focusRing.style.opacity = 0;
+        }, 600);
+    });
+
+    // Shutter Flash
+    function shutterFlash() {
+        flashScreen.style.opacity = 1;
+        setTimeout(() => flashScreen.style.opacity = 0, 150);
+    }
+
+    // Take photo
     function takePhoto() {
+        shutterFlash();
+
         let canvas = document.createElement("canvas");
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        let ctx = canvas.getContext("2d");
-        ctx.drawImage(video, 0, 0);
+        canvas.getContext("2d").drawImage(video, 0, 0);
+        photo.src = canvas.toDataURL("image/png");
 
-        let dataURL = canvas.toDataURL("image/png");
-        capturedPhoto.src = dataURL;
-
-        // Switch View
         video.style.display = "none";
-        capturedPhoto.style.display = "block";
+        photo.style.display = "block";
         backBtn.style.display = "block";
     }
 
-    // Back to Camera
     function backToCamera() {
-        capturedPhoto.style.display = "none";
+        photo.style.display = "none";
         video.style.display = "block";
         backBtn.style.display = "none";
+    }
+
+    // Zoom Controls
+    function setZoom(level) {
+        let track = currentStream.getVideoTracks()[0];
+        let capabilities = track.getCapabilities();
+
+        document.querySelectorAll(".zoom-btn").forEach(btn => btn.classList.remove("active"));
+
+        if (capabilities.zoom) {
+            track.applyConstraints({ advanced: [{ zoom: level }] });
+        }
+
+        // Mark active button
+        let buttons = document.querySelectorAll(".zoom-btn");
+        buttons.forEach(btn => {
+            if (btn.innerText === level + "x") btn.classList.add("active");
+        });
     }
 </script>
 
