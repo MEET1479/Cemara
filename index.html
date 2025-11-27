@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>iPhone Style Camera</title>
+<style>
+    body {
+        margin: 0;
+        background: black;
+        font-family: Arial, sans-serif;
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+
+    .camera-container {
+        width: 360px;
+        height: 720px;
+        background: #000;
+        border-radius: 40px;
+        border: 2px solid #333;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .top-bar {
+        position: absolute;
+        top: 15px;
+        width: 100%;
+        text-align: center;
+        font-size: 14px;
+        opacity: 0.8;
+        z-index: 10;
+    }
+
+    video, #capturedPhoto {
+        width: 100%;
+        height: 70%;
+        object-fit: cover;
+        margin-top: 60px;
+        border-radius: 20px;
+        display: block;
+    }
+
+    #capturedPhoto {
+        display: none;
+    }
+
+    .modes {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 10px;
+        z-index: 10;
+    }
+
+    .mode {
+        font-size: 16px;
+        opacity: 0.5;
+    }
+
+    .mode.active {
+        opacity: 1;
+        font-weight: bold;
+        color: #ffd600;
+    }
+
+    .shutter-area {
+        position: absolute;
+        bottom: 30px;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        z-index: 10;
+    }
+
+    .shutter {
+        width: 80px;
+        height: 80px;
+        background: white;
+        border-radius: 50%;
+        border: 5px solid #ccc;
+        cursor: pointer;
+    }
+
+    .back-btn {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        border: 3px solid white;
+        display: none;
+        cursor: pointer;
+    }
+</style>
+</head>
+<body>
+
+<div class="camera-container">
+
+    <div class="top-bar">
+        ● ○ 1x &nbsp; Portrait OFF
+    </div>
+
+    <video id="camera" autoplay playsinline></video>
+    <img id="capturedPhoto">
+
+    <div class="modes">
+        <div class="mode">PORTRAIT</div>
+        <div class="mode active">PHOTO</div>
+        <div class="mode">VIDEO</div>
+    </div>
+
+    <div class="shutter-area">
+        <div class="back-btn" id="backBtn" onclick="backToCamera()"></div>
+        <div class="shutter" onclick="takePhoto()"></div>
+    </div>
+
+</div>
+
+<script>
+    const video = document.getElementById("camera");
+    const capturedPhoto = document.getElementById("capturedPhoto");
+    const backBtn = document.getElementById("backBtn");
+
+    // Start Camera
+    async function startCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+        } catch (err) {
+            console.log("Camera error:", err);
+            alert("Camera access blocked!");
+        }
+    }
+    startCamera();
+
+    // Take Photo
+    function takePhoto() {
+        let canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        let ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0);
+
+        let dataURL = canvas.toDataURL("image/png");
+        capturedPhoto.src = dataURL;
+
+        // Switch View
+        video.style.display = "none";
+        capturedPhoto.style.display = "block";
+        backBtn.style.display = "block";
+    }
+
+    // Back to Camera
+    function backToCamera() {
+        capturedPhoto.style.display = "none";
+        video.style.display = "block";
+        backBtn.style.display = "none";
+    }
+</script>
+
+</body>
+</html>
